@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fixed Point — Speed Reader</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#121110">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fixed Point">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #121110;
+    --bg-raised: #1a1917;
+    --text: #f2ede2;
+    --text-dim: #8a8478;
+    --text-faint: #4a463e;
+    --accent: #e2432a;
+    --accent-dim: #6b2318;
+    --line: #2a2722;
+    --mono: 'JetBrains Mono', monospace;
+    --serif: 'Fraunces', serif;
+    --sans: 'Inter', sans-serif;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  .app{
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 28px 24px 20px;
+  }
+
+  header{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    flex-shrink: 0;
+  }
+
+  h1{
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 20px;
+    letter-spacing: 0.01em;
+    margin: 0;
+    color: var(--text);
+  }
+  h1 span{ color: var(--accent); }
+
+  .eyebrow{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* ---- Setup screen ---- */
+  #setup{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 14px;
+  }
+
+  textarea{
+    flex: 1;
+    width: 100%;
+    resize: none;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 16px;
+    outline: none;
+  }
+  textarea:focus{ border-color: var(--text-faint); }
+  textarea::placeholder{ color: var(--text-faint); }
+
+  .setup-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .wpm-control{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  input[type="range"]{
+    -webkit-appearance: none;
+    width: 160px;
+    height: 2px;
+    background: var(--line);
+    border-radius: 2px;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    margin-top: -5px;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width: 13px; height: 13px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-track{
+    height: 2px;
+    background: var(--line);
+    border-radius: 2px;
+  }
+
+  .wpm-num{ color: var(--accent); font-weight: 500; min-width: 34px; }
+
+  button{
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    padding: 11px 22px;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+  }
+  button:active{ transform: scale(0.97); }
+  button:disabled{ opacity: 0.35; cursor: not-allowed; }
+
+  .btn-primary{ background: var(--accent); color: #1a0f0c; }
+  .btn-primary:hover:not(:disabled){ opacity: 0.88; }
+
+  .btn-ghost{
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--line);
+  }
+  .btn-ghost:hover{ color: var(--text); border-color: var(--text-faint); }
+
+  /* ---- Reader screen ---- */
+  #reader{
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .stage{
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* reticle: the signature element marking the fixed focal point */
+  .reticle{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    max-width: 640px;
+    pointer-events: none;
+  }
+  .reticle::before, .reticle::after{
+    content: '';
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    background: var(--line);
+  }
+  .reticle::before{ bottom: 46px; height: 22px; }
+  .reticle::after{ top: 46px; height: 22px; }
+  .tick{
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+  }
+  .tick.top{ top: 34px; }
+  .tick.bottom{ bottom: 34px; }
+
+  .word-row{
+    display: flex;
+    align-items: baseline;
+    width: 100%;
+    max-width: 640px;
+    font-family: var(--serif);
+    font-size: clamp(38px, 6vw, 62px);
+    font-weight: 500;
+    line-height: 1;
+  }
+  .word-left{
+    flex: 1;
+    min-width: 0;
+    text-align: right;
+    white-space: pre;
+    overflow: hidden;
+    color: var(--text);
+  }
+  .word-pivot{
+    flex: none;
+    color: var(--accent);
+    padding: 0 1px;
+  }
+  .word-right{
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    white-space: pre;
+    overflow: hidden;
+    color: var(--text);
+  }
+
+  .context-line{
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    height: 18px;
+    letter-spacing: 0.02em;
+  }
+
+  .controls{
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+    padding-top: 18px;
+  }
+
+  .progress-track{
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .progress-fill{
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.05s linear;
+  }
+
+  .controls-row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .transport{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .icon-btn{
+    background: var(--bg-raised);
+    color: var(--text);
+    border: 1px solid var(--line);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+  }
+  .icon-btn:hover{ border-color: var(--text-faint); }
+  .icon-btn.play{
+    background: var(--accent);
+    color: #1a0f0c;
+    border: none;
+    width: 46px; height: 46px;
+  }
+  .icon-btn.play:hover{ opacity: 0.88; }
+
+  .stat{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .stat b{ color: var(--text-dim); font-weight: 500; }
+
+  kbd{
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--text-faint);
+  }
+
+  .hint{
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 520px){
+    .word-row{ font-size: 38px; }
+    .setup-row{ flex-direction: column; align-items: stretch; }
+    .wpm-control{ justify-content: space-between; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Fixed<span>·</span>Point</h1>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <button id="installBtn" class="btn-ghost" style="display:none; padding:7px 14px; font-size:12px;">Install app</button>
+      <span class="eyebrow" id="modeLabel">setup</span>
+    </div>
+  </header>
+
+  <div id="setup">
+    <textarea id="inputText" placeholder="Paste or type the text you want to read here…"></textarea>
+    <div class="setup-row">
+      <div class="wpm-control">
+        WPM
+        <input type="range" id="wpmSlider" min="150" max="700" step="10" value="350">
+        <span class="wpm-num" id="wpmNum">350</span>
+      </div>
+      <button class="btn-primary" id="startBtn" disabled>Start reading</button>
+    </div>
+  </div>
+
+  <div id="reader">
+    <div class="stage">
+      <div class="reticle">
+        <div class="tick top"></div>
+        <div class="tick bottom"></div>
+      </div>
+      <div class="word-row">
+        <span class="word-left" id="wordLeft"></span><span class="word-pivot" id="wordPivot"></span><span class="word-right" id="wordRight"></span>
+      </div>
+    </div>
+    <div class="context-line" id="contextLine"></div>
+
+    <div class="controls">
+      <div class="progress-track" id="progressTrack">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="controls-row">
+        <div class="stat"><b id="wordIndex">0</b>&nbsp;/&nbsp;<span id="wordTotal">0</span></div>
+        <div class="transport">
+          <button class="icon-btn" id="restartBtn" title="Restart">⟲</button>
+          <button class="icon-btn" id="backBtn" title="Back 10 words">‹‹</button>
+          <button class="icon-btn play" id="playBtn" title="Play / Pause">▶</button>
+          <button class="icon-btn" id="fwdBtn" title="Forward 10 words">››</button>
+          <button class="icon-btn" id="editBtn" title="Edit text">✎</button>
+        </div>
+        <div class="wpm-control">
+          <input type="range" id="wpmSliderLive" min="150" max="700" step="10" value="350" style="width:110px">
+          <span class="wpm-num" id="wpmNumLive">350</span>
+        </div>
+      </div>
+      <div class="hint"><kbd>Space</kbd> play/pause &nbsp; <kbd>←</kbd> <kbd>→</kbd> jump 10 words &nbsp; <kbd>Esc</kbd> edit text</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const setupEl = document.getElementById('setup');
+  const readerEl = document.getElementById('reader');
+  const modeLabel = document.getElementById('modeLabel');
+  const inputText = document.getElementById('inputText');
+  const startBtn = document.getElementById('startBtn');
+
+  const wpmSlider = document.getElementById('wpmSlider');
+  const wpmNum = document.getElementById('wpmNum');
+  const wpmSliderLive = document.getElementById('wpmSliderLive');
+  const wpmNumLive = document.getElementById('wpmNumLive');
+
+  const wordLeft = document.getElementById('wordLeft');
+  const wordPivot = document.getElementById('wordPivot');
+  const wordRight = document.getElementById('wordRight');
+  const contextLine = document.getElementById('contextLine');
+
+  const progressFill = document.getElementById('progressFill');
+  const progressTrack = document.getElementById('progressTrack');
+  const wordIndexEl = document.getElementById('wordIndex');
+  const wordTotalEl = document.getElementById('wordTotal');
+
+  const playBtn = document.getElementById('playBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const backBtn = document.getElementById('backBtn');
+  const fwdBtn = document.getElementById('fwdBtn');
+  const editBtn = document.getElementById('editBtn');
+
+  let words = [];
+  let idx = 0;
+  let playing = false;
+  let timer = null;
+  let wpm = 350;
+
+  function syncWpm(val){
+    wpm = val;
+    wpmNum.textContent = val;
+    wpmNumLive.textContent = val;
+    wpmSlider.value = val;
+    wpmSliderLive.value = val;
+  }
+  wpmSlider.addEventListener('input', e => syncWpm(+e.target.value));
+  wpmSliderLive.addEventListener('input', e => syncWpm(+e.target.value));
+
+  inputText.addEventListener('input', () => {
+    startBtn.disabled = inputText.value.trim().length === 0;
+  });
+
+  function getORPIndex(word){
+    const len = word.length;
+    if(len <= 1) return 0;
+    if(len <= 4) return 1;
+    if(len <= 9) return 2;
+    if(len <= 13) return 3;
+    return 4;
+  }
+
+  function delayForWord(word){
+    const base = 60000 / wpm;
+    let mult = 1;
+    const len = word.length;
+    if(len > 7) mult += 0.25;
+    if(len > 11) mult += 0.25;
+    if(/[.!?]$/.test(word)) mult += 1.4;
+    else if(/[,;:—-]$/.test(word)) mult += 0.7;
+    return base * mult;
+  }
+
+  function renderWord(){
+    const w = words[idx] || '';
+    const clean = w.trim();
+    if(clean.length === 0){
+      wordLeft.textContent = ''; wordPivot.textContent = ''; wordRight.textContent = '';
+    } else {
+      const pIdx = getORPIndex(clean);
+      wordLeft.textContent = clean.slice(0, pIdx);
+      wordPivot.textContent = clean[pIdx];
+      wordRight.textContent = clean.slice(pIdx + 1);
+    }
+    wordIndexEl.textContent = idx + 1;
+    progressFill.style.width = ((idx + 1) / words.length * 100) + '%';
+
+    const ctxBefore = words.slice(Math.max(0, idx - 4), idx).join(' ');
+    const ctxAfter = words.slice(idx + 1, idx + 4).join(' ');
+    contextLine.textContent = ctxBefore + (ctxBefore ? '   ' : '') + (ctxAfter ? '   ' + ctxAfter : '');
+  }
+
+  function scheduleNext(){
+    clearTimeout(timer);
+    if(!playing) return;
+    const w = words[idx] || '';
+    timer = setTimeout(() => {
+      if(idx >= words.length - 1){ pause(); return; }
+      idx++;
+      renderWord();
+      scheduleNext();
+    }, delayForWord(w));
+  }
+
+  function play(){
+    if(words.length === 0) return;
+    if(idx >= words.length - 1) idx = 0;
+    playing = true;
+    playBtn.textContent = '❚❚';
+    scheduleNext();
+  }
+  function pause(){
+    playing = false;
+    playBtn.textContent = '▶';
+    clearTimeout(timer);
+  }
+  function toggle(){ playing ? pause() : play(); }
+
+  function jump(delta){
+    idx = Math.max(0, Math.min(words.length - 1, idx + delta));
+    renderWord();
+    if(playing) scheduleNext();
+  }
+
+  function startReading(){
+    words = inputText.value.trim().split(/\s+/).filter(Boolean);
+    if(words.length === 0) return;
+    idx = 0;
+    wordTotalEl.textContent = words.length;
+    setupEl.style.display = 'none';
+    readerEl.style.display = 'flex';
+    modeLabel.textContent = 'reading';
+    renderWord();
+    play();
+  }
+
+  function backToEdit(){
+    pause();
+    readerEl.style.display = 'none';
+    setupEl.style.display = 'flex';
+    modeLabel.textContent = 'setup';
+  }
+
+  startBtn.addEventListener('click', startReading);
+  playBtn.addEventListener('click', toggle);
+  restartBtn.addEventListener('click', () => { idx = 0; renderWord(); if(playing) scheduleNext(); });
+  backBtn.addEventListener('click', () => jump(-10));
+  fwdBtn.addEventListener('click', () => jump(10));
+  editBtn.addEventListener('click', backToEdit);
+
+  progressTrack.addEventListener('click', (e) => {
+    const rect = progressTrack.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    idx = Math.max(0, Math.min(words.length - 1, Math.round(frac * (words.length - 1))));
+    renderWord();
+    if(playing) scheduleNext();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if(readerEl.style.display !== 'flex') return;
+    if(e.code === 'Space'){ e.preventDefault(); toggle(); }
+    else if(e.code === 'ArrowRight'){ e.preventDefault(); jump(10); }
+    else if(e.code === 'ArrowLeft'){ e.preventDefault(); jump(-10); }
+    else if(e.code === 'Escape'){ e.preventDefault(); backToEdit(); }
+  });
+
+  syncWpm(350);
+
+  // --- PWA install + offline support ---
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  let deferredPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.style.display = 'inline-block';
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
+  });
+
+  window.addEventListener('appinstalled', () => {
+    installBtn.style.display = 'none';
+  });
+})();
+</script>
+</body>
+</html>
