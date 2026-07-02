@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fixed-point-v2';
+const CACHE_NAME = 'fixed-point-v1.3';
 const ASSETS = [
   './index.html',
   './manifest.json',
