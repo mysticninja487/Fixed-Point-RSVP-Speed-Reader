@@ -83,6 +83,50 @@
     gap: 14px;
   }
 
+  .upload-zone{
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-align: center;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .upload-zone.dragover{
+    border-color: var(--accent);
+    background: rgba(226,67,42,0.06);
+  }
+  .upload-icon{
+    color: var(--text-faint);
+    font-size: 15px;
+  }
+  .upload-text{
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .link-btn{
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .upload-status{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    width: 100%;
+  }
+  .upload-status.error{ color: var(--accent); }
+
   textarea{
     flex: 1;
     width: 100%;
@@ -358,6 +402,12 @@
   </header>
 
   <div id="setup">
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx" hidden>
+      <span class="upload-icon">⇪</span>
+      <span class="upload-text">Drop a .txt, .pdf, or .docx file here, or <button type="button" class="link-btn" id="browseBtn">browse</button></span>
+      <span class="upload-status" id="uploadStatus"></span>
+    </div>
     <textarea id="inputText" placeholder="Paste or type the text you want to read here…"></textarea>
     <div class="setup-row">
       <div class="wpm-control">
@@ -404,6 +454,8 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.11.0/mammoth.browser.min.js"></script>
 <script>
 (function(){
   const setupEl = document.getElementById('setup');
@@ -451,6 +503,95 @@
 
   inputText.addEventListener('input', () => {
     startBtn.disabled = inputText.value.trim().length === 0;
+  });
+
+  // --- File upload / extraction ---
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const browseBtn = document.getElementById('browseBtn');
+  const uploadStatus = document.getElementById('uploadStatus');
+
+  function setStatus(msg, isError){
+    uploadStatus.textContent = msg;
+    uploadStatus.classList.toggle('error', !!isError);
+  }
+
+  async function extractTxt(file){
+    return await file.text();
+  }
+
+  async function extractPdf(file){
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(' ') + '\n\n';
+    }
+    return text;
+  }
+
+  async function extractDocx(file){
+    const buf = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    return result.value;
+  }
+
+  async function handleFile(file){
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    const supported = { txt: extractTxt, md: extractTxt, pdf: extractPdf, docx: extractDocx };
+
+    if (ext === 'doc'){
+      setStatus('Old .doc files aren\'t supported — please save as .docx and try again.', true);
+      return;
+    }
+    if (!supported[ext]){
+      setStatus(`Unsupported file type ".${ext}" — use .txt, .pdf, or .docx.`, true);
+      return;
+    }
+
+    setStatus(`Reading ${file.name}…`);
+    startBtn.disabled = true;
+    try {
+      const text = await supported[ext](file);
+      const trimmed = text.trim();
+      if (trimmed.length === 0){
+        setStatus(`Couldn't find any text in ${file.name}. It may be a scanned/image-only file.`, true);
+        return;
+      }
+      inputText.value = trimmed;
+      const wc = trimmed.split(/\s+/).filter(Boolean).length;
+      setStatus(`Loaded ${wc.toLocaleString()} words from ${file.name}`);
+      startBtn.disabled = false;
+    } catch (err){
+      setStatus(`Couldn't read ${file.name}: ${err.message || err}`, true);
+    }
+  }
+
+  browseBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+  ['dragenter', 'dragover'].forEach(evt =>
+    uploadZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    })
+  );
+  ['dragleave', 'drop'].forEach(evt =>
+    uploadZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+    })
+  );
+  uploadZone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
   });
 
   function getORPIndex(word){
