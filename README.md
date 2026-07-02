@@ -11,6 +11,7 @@ the word changes underneath them.
 - Adjustable words-per-minute (150–700)
 - Automatically pauses longer on punctuation and long words
 - Keyboard shortcuts: `Space` play/pause, `←`/`→` jump 10 words, `Esc` edit text
+- Upload a `.txt`, `.pdf`, or `.docx` file to extract text automatically
 - Installable as a standalone app (PWA) on desktop, Android, and iOS
 - Works fully offline once installed
 
