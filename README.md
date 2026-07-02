@@ -5,7 +5,7 @@ flash one at a time, each aligned so its "optimal recognition point" letter
 stays in the exact same spot on screen — your eyes never have to move, only
 the word changes underneath them.
 
-**[Live demo →](#)**  *(replace with your GitHub Pages URL after deploying, see below)*
+**[Live demo →](https://mysticninja487.github.io/Fixed-Point-RSVP-Speed-Reader/)**
 
 ## Features
 - Adjustable words-per-minute (150–700)
